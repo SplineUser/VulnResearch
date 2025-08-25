@@ -1,0 +1,193 @@
+The driver exposes IOCTL calls that allow reading from a user-supplied IRP buffer to select a PCI device via the PCI CONFIG_ADDRESS port (0xCF8). It also permits read/write access to the selected device’s PCI configuration space through ports 0xCFC–0xCFF.
+
+This behavior can lead to local privilege escalation (LPE), denial-of-service or bricking of hardware, bypassing of ASLR, and expansion of the attack surface for devices, including potential manipulation of firmware or persistent code beyond the OS.
+
+The driver is signed and loadable, bypassing windows security mechanisms for loading drivers.
+
+Vulnerable code: 
+
+undefined4 IRP_MJ_DEVICE_CONTROL(longlong DeviceExtention,longlong IRP)
+
+{
+  byte bVar1;
+  char *pcVar2;
+  uint *IRP_cntrl_var_0x18;
+  int iVar3;
+  undefined4 exit_code;
+  uint uVar4;
+  byte local_res8;
+  longlong IRP_cntrl_var_0b8;
+  uint IRP_cntrl_var_0xb8_+_0x18;
+  undefined1 User_controllable_var;
+  
+  if ((DeviceExtention == 0) || (IRP == 0)) {
+    return 0;
+  }
+  *(undefined8 *)(IRP + 0x38) = 0;
+  IRP_cntrl_var_0b8 = *(longlong *)(IRP + 0xb8);
+  IRP_cntrl_var_0xb8_+_0x18 = *(uint *)(IRP_cntrl_var_0b8 + 0x18);
+  if (IRP_cntrl_var_0xb8_+_0x18 < 0x220019) {
+    if (IRP_cntrl_var_0xb8_+_0x18 == 0x220018) {
+      IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
+      if ((IRP_cntrl_var_0x18 == (uint *)0x0) || (*(int *)(IRP_cntrl_var_0b8 + 8) == 0))
+      goto LAB_00011bd0;
+      if ((IRP_cntrl_var_0x18[2] & 3) == 0) {
+        out(0xcf8,(IRP_cntrl_var_0x18[1] >> 5 & 7 | (IRP_cntrl_var_0x18[1] & 0x1f) << 3) << 8 |
+                  (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10 | IRP_cntrl_var_0x18[2] & 0xfffffffc) ;
+        IRP_cntrl_var_0xb8_+_0x18 = in(0xcfc);
+        *IRP_cntrl_var_0x18 = 4;
+LAB_000117dd:
+        IRP_cntrl_var_0x18[1] = IRP_cntrl_var_0xb8_+_0x18;
+      }
+    }
+    else if (IRP_cntrl_var_0xb8_+_0x18 != 0x220004) {
+      if (IRP_cntrl_var_0xb8_+_0x18 == 0x220008) {
+        IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
+        if ((IRP_cntrl_var_0x18 != (uint *)0x0) && (7 < *(uint *)(IRP_cntrl_var_0b8 + 8))) {
+          IRP_cntrl_var_0xb8_+_0x18 = IRP_cntrl_var_0x18[1];
+          uVar4 = IRP_cntrl_var_0xb8_+_0x18 >> 5 & 7;
+          IRP_cntrl_var_0xb8_+_0x18 = IRP_cntrl_var_0xb8_+_0x18 & 0x1f;
+          if ((*IRP_cntrl_var_0x18 < 0x100) && ((IRP_cntrl_var_0xb8_+_0x18 < 0x20 && (uVar4 < 8))) )
+          {
+            bVar1 = (&DAT_000141c0)
+                    [(ulonglong)uVar4 +
+                     ((ulonglong)*IRP_cntrl_var_0x18 * 0x20 + (ulonglong)IRP_cntrl_var_0xb8_+_0x18 )
+                     * 8];
+            if (bVar1 < DAT_000241c0) {
+              memcpy(IRP_cntrl_var_0x18 + 1,(void *)((ulonglong)bVar1 * 0x100 + DAT_000141a0),0x10 0)
+              ;
+              *IRP_cntrl_var_0x18 = 4;
+            }
+            else {
+              *IRP_cntrl_var_0x18 = -(uint)(bVar1 != 0xff) & 2;
+            }
+            goto LAB_00011bc7;
+          }
+        }
+        goto LAB_00011bd0;
+      }
+      if (IRP_cntrl_var_0xb8_+_0x18 != 0x22000c) {
+        if (IRP_cntrl_var_0xb8_+_0x18 == 0x220010) {
+          IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
+          if (IRP_cntrl_var_0x18 == (uint *)0x0) goto LAB_00011bd0;
+          iVar3 = 0;
+          pcVar2 = &DAT_00014120;
+          do {
+            if (*pcVar2 == (char)*IRP_cntrl_var_0x18) {
+              IRP_cntrl_var_0xb8_+_0x18 = (&DAT_00014124)[(longlong)iVar3 * 2];
+              goto LAB_000117dd;
+            }
+            pcVar2 = pcVar2 + 8;
+            iVar3 = iVar3 + 1;
+          } while ((longlong)pcVar2 < 0x14148);
+        }
+        else {
+          if (IRP_cntrl_var_0xb8_+_0x18 != 0x220014) goto LAB_00011bd0;
+          Hardcoded_PCI_config_write();
+        }
+      }
+    }
+  }
+  else if (IRP_cntrl_var_0xb8_+_0x18 == 0x22001c) {
+    IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
+    if ((IRP_cntrl_var_0x18 == (uint *)0x0) || (*(int *)(IRP_cntrl_var_0b8 + 8) == 0))
+    goto LAB_00011bd0;
+    out(0xcf8,IRP_cntrl_var_0x18[2] & 0xfffffffc |
+              (IRP_cntrl_var_0x18[1] >> 5 & 7 | (IRP_cntrl_var_0x18[1] & 0x1f) << 3) << 8 |
+              (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10);
+    IRP_cntrl_var_0xb8_+_0x18 = IRP_cntrl_var_0x18[2] & 3;
+    if (IRP_cntrl_var_0xb8_+_0x18 == 0) {
+      local_res8 = in(0xcfc);
+    }
+    else if (IRP_cntrl_var_0xb8_+_0x18 == 1) {
+      local_res8 = in(0xcfd);
+    }
+    else if (IRP_cntrl_var_0xb8_+_0x18 == 2) {
+      local_res8 = in(0xcfe);
+    }
+    else if (IRP_cntrl_var_0xb8_+_0x18 == 3) {
+      local_res8 = in(0xcff);
+    }
+    *IRP_cntrl_var_0x18 = 4;
+    IRP_cntrl_var_0x18[1] = (uint)local_res8;
+  }
+  else if (IRP_cntrl_var_0xb8_+_0x18 == 0x220020) {
+    IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
+    if ((IRP_cntrl_var_0x18 == (uint *)0x0) || (*(int *)(IRP_cntrl_var_0b8 + 8) == 0))
+    goto LAB_00011bd0;
+    if ((IRP_cntrl_var_0x18[2] & 3) == 0) {
+      out(0xcf8,(IRP_cntrl_var_0x18[1] >> 5 & 7 | (IRP_cntrl_var_0x18[1] & 0x1f) << 3) << 8 |
+                (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10 | IRP_cntrl_var_0x18[2] & 0xfffffffc);
+      out(0xcfc,IRP_cntrl_var_0x18[3]);
+      *IRP_cntrl_var_0x18 = 4;
+    }
+  }
+  else if (IRP_cntrl_var_0xb8_+_0x18 == 0x220024) {
+    IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
+    if ((IRP_cntrl_var_0x18 == (uint *)0x0) || (*(int *)(IRP_cntrl_var_0b8 + 8) == 0))
+    goto LAB_00011bd0;
+    User_controllable_var = (undefined1)IRP_cntrl_var_0x18[3];
+    out(0xcf8,IRP_cntrl_var_0x18[2] & 0xfffffffc |
+              (IRP_cntrl_var_0x18[1] >> 5 & 7 | (IRP_cntrl_var_0x18[1] & 0x1f) << 3) << 8 |
+              (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10);
+    IRP_cntrl_var_0xb8_+_0x18 = IRP_cntrl_var_0x18[2] & 3;
+    if (IRP_cntrl_var_0xb8_+_0x18 == 0) {
+      out(0xcfc,User_controllable_var);
+    }
+    else if (IRP_cntrl_var_0xb8_+_0x18 == 1) {
+      out(0xcfd,User_controllable_var);
+    }
+    else if (IRP_cntrl_var_0xb8_+_0x18 == 2) {
+      out(0xcfe,User_controllable_var);
+    }
+    else if (IRP_cntrl_var_0xb8_+_0x18 == 3) {
+      out(0xcff,User_controllable_var);
+    }
+  }
+  else if (IRP_cntrl_var_0xb8_+_0x18 == 0x220028) {
+    IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
+    if ((IRP_cntrl_var_0x18 == (uint *)0x0) || (*(int *)(IRP_cntrl_var_0b8 + 8) == 0))
+    goto LAB_00011bd0;
+    out(0xcf8,((IRP_cntrl_var_0x18[1] & 0x1f) << 3 | IRP_cntrl_var_0x18[1] >> 5 & 7) << 8 |
+              (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10 | IRP_cntrl_var_0x18[2] & 0xfffffffc);
+    IRP_cntrl_var_0xb8_+_0x18 = in(0xcfc);
+    uVar4 = IRP_cntrl_var_0x18[2] & 3;
+    if (uVar4 == 0) {
+      *IRP_cntrl_var_0x18 = 4;
+      IRP_cntrl_var_0x18[1] = IRP_cntrl_var_0xb8_+_0x18 & 0xffff;
+    }
+    if (uVar4 == 2) {
+      *IRP_cntrl_var_0x18 = 4;
+      IRP_cntrl_var_0x18[1] = IRP_cntrl_var_0xb8_+_0x18 >> 0x10;
+    }
+  }
+  else {
+    if (((IRP_cntrl_var_0xb8_+_0x18 != 0x22002c) ||
+        (IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18), IRP_cntrl_var_0x18 == (uint *)0x0)) ||
+       (*(int *)(IRP_cntrl_var_0b8 + 8) == 0)) {
+LAB_00011bd0:
+      *(undefined8 *)(IRP + 0x38) = 0;
+      exit_code = 0xc000000d;
+      goto LAB_00011bda;
+    }
+    out(0xcf8,((IRP_cntrl_var_0x18[1] & 0x1f) << 3 | IRP_cntrl_var_0x18[1] >> 5 & 7) << 8 |
+              (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10 | IRP_cntrl_var_0x18[2] & 0xfffffffc);
+    in(0xcfc);
+    IRP_cntrl_var_0xb8_+_0x18 = IRP_cntrl_var_0x18[2] & 3;
+    if (IRP_cntrl_var_0xb8_+_0x18 == 0) {
+      *IRP_cntrl_var_0x18 = 4;
+      out(0xcfc,(short)IRP_cntrl_var_0x18[3]);
+    }
+    if (IRP_cntrl_var_0xb8_+_0x18 == 2) {
+      *IRP_cntrl_var_0x18 = 4;
+      out(0xcfe,(short)IRP_cntrl_var_0x18[3]);
+    }
+  }
+LAB_00011bc7:
+  exit_code = 0;
+  *(ulonglong *)(IRP + 0x38) = (ulonglong)*(uint *)(IRP_cntrl_var_0b8 + 8);
+LAB_00011bda:
+  *(undefined4 *)(IRP + 0x30) = exit_code;
+  IofCompleteRequest(IRP,0);
+  return exit_code;
+}
