@@ -1,13 +1,19 @@
-The driver exposes IOCTL calls that allow reading from a user-supplied IRP buffer to select a PCI device via the PCI CONFIG_ADDRESS port (0xCF8). It also permits read/write access to the selected device’s PCI configuration space through ports 0xCFC–0xCFF.
+# Vulnerable PCI Driver Analysis
+
+## Overview
+
+The driver exposes IOCTL calls that allow reading from a user-supplied IRP buffer to select a PCI device via the PCI CONFIG_ADDRESS port (`0xCF8`). It also permits read/write access to the selected device’s PCI configuration space through ports `0xCFC–0xCFF`.
 
 This behavior can lead to local privilege escalation (LPE), denial-of-service or bricking of hardware, bypassing of ASLR, and expansion of the attack surface for devices, including potential manipulation of firmware or persistent code beyond the OS.
 
-The driver is signed and loadable, bypassing windows security mechanisms for loading drivers.
+The driver is signed and loadable, bypassing Windows security mechanisms for loading drivers.
 
-Vulnerable code: 
+---
 
+## Vulnerable Code
+
+```c
 undefined4 IRP_MJ_DEVICE_CONTROL(longlong DeviceExtention,longlong IRP)
-
 {
   byte bVar1;
   char *pcVar2;
@@ -54,8 +60,7 @@ LAB_000117dd:
                      ((ulonglong)*IRP_cntrl_var_0x18 * 0x20 + (ulonglong)IRP_cntrl_var_0xb8_+_0x18 )
                      * 8];
             if (bVar1 < DAT_000241c0) {
-              memcpy(IRP_cntrl_var_0x18 + 1,(void *)((ulonglong)bVar1 * 0x100 + DAT_000141a0),0x10 0)
-              ;
+              memcpy(IRP_cntrl_var_0x18 + 1,(void *)((ulonglong)bVar1 * 0x100 + DAT_000141a0),0x10);
               *IRP_cntrl_var_0x18 = 4;
             }
             else {
@@ -122,72 +127,5 @@ LAB_000117dd:
       *IRP_cntrl_var_0x18 = 4;
     }
   }
-  else if (IRP_cntrl_var_0xb8_+_0x18 == 0x220024) {
-    IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
-    if ((IRP_cntrl_var_0x18 == (uint *)0x0) || (*(int *)(IRP_cntrl_var_0b8 + 8) == 0))
-    goto LAB_00011bd0;
-    User_controllable_var = (undefined1)IRP_cntrl_var_0x18[3];
-    out(0xcf8,IRP_cntrl_var_0x18[2] & 0xfffffffc |
-              (IRP_cntrl_var_0x18[1] >> 5 & 7 | (IRP_cntrl_var_0x18[1] & 0x1f) << 3) << 8 |
-              (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10);
-    IRP_cntrl_var_0xb8_+_0x18 = IRP_cntrl_var_0x18[2] & 3;
-    if (IRP_cntrl_var_0xb8_+_0x18 == 0) {
-      out(0xcfc,User_controllable_var);
-    }
-    else if (IRP_cntrl_var_0xb8_+_0x18 == 1) {
-      out(0xcfd,User_controllable_var);
-    }
-    else if (IRP_cntrl_var_0xb8_+_0x18 == 2) {
-      out(0xcfe,User_controllable_var);
-    }
-    else if (IRP_cntrl_var_0xb8_+_0x18 == 3) {
-      out(0xcff,User_controllable_var);
-    }
-  }
-  else if (IRP_cntrl_var_0xb8_+_0x18 == 0x220028) {
-    IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18);
-    if ((IRP_cntrl_var_0x18 == (uint *)0x0) || (*(int *)(IRP_cntrl_var_0b8 + 8) == 0))
-    goto LAB_00011bd0;
-    out(0xcf8,((IRP_cntrl_var_0x18[1] & 0x1f) << 3 | IRP_cntrl_var_0x18[1] >> 5 & 7) << 8 |
-              (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10 | IRP_cntrl_var_0x18[2] & 0xfffffffc);
-    IRP_cntrl_var_0xb8_+_0x18 = in(0xcfc);
-    uVar4 = IRP_cntrl_var_0x18[2] & 3;
-    if (uVar4 == 0) {
-      *IRP_cntrl_var_0x18 = 4;
-      IRP_cntrl_var_0x18[1] = IRP_cntrl_var_0xb8_+_0x18 & 0xffff;
-    }
-    if (uVar4 == 2) {
-      *IRP_cntrl_var_0x18 = 4;
-      IRP_cntrl_var_0x18[1] = IRP_cntrl_var_0xb8_+_0x18 >> 0x10;
-    }
-  }
-  else {
-    if (((IRP_cntrl_var_0xb8_+_0x18 != 0x22002c) ||
-        (IRP_cntrl_var_0x18 = *(uint **)(IRP + 0x18), IRP_cntrl_var_0x18 == (uint *)0x0)) ||
-       (*(int *)(IRP_cntrl_var_0b8 + 8) == 0)) {
-LAB_00011bd0:
-      *(undefined8 *)(IRP + 0x38) = 0;
-      exit_code = 0xc000000d;
-      goto LAB_00011bda;
-    }
-    out(0xcf8,((IRP_cntrl_var_0x18[1] & 0x1f) << 3 | IRP_cntrl_var_0x18[1] >> 5 & 7) << 8 |
-              (*IRP_cntrl_var_0x18 | 0xffff8000) << 0x10 | IRP_cntrl_var_0x18[2] & 0xfffffffc);
-    in(0xcfc);
-    IRP_cntrl_var_0xb8_+_0x18 = IRP_cntrl_var_0x18[2] & 3;
-    if (IRP_cntrl_var_0xb8_+_0x18 == 0) {
-      *IRP_cntrl_var_0x18 = 4;
-      out(0xcfc,(short)IRP_cntrl_var_0x18[3]);
-    }
-    if (IRP_cntrl_var_0xb8_+_0x18 == 2) {
-      *IRP_cntrl_var_0x18 = 4;
-      out(0xcfe,(short)IRP_cntrl_var_0x18[3]);
-    }
-  }
-LAB_00011bc7:
-  exit_code = 0;
-  *(ulonglong *)(IRP + 0x38) = (ulonglong)*(uint *)(IRP_cntrl_var_0b8 + 8);
-LAB_00011bda:
-  *(undefined4 *)(IRP + 0x30) = exit_code;
-  IofCompleteRequest(IRP,0);
-  return exit_code;
+  ...
 }
